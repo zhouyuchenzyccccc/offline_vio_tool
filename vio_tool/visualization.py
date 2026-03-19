@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -106,6 +107,66 @@ def save_all_plots(poses: list[Pose], out_dir: str | Path, prefix: str = "traj")
     plot_motion_deltas(poses, p3)
 
     return {"traj3d": p1, "curves": p2, "delta": p3}
+
+
+def save_trajectory_video(
+    poses: list[Pose],
+    out_path: str | Path,
+    fps: int = 20,
+    tail_length: int = 120,
+) -> Path:
+    if not poses:
+        raise ValueError("No poses to visualize")
+
+    out_path = Path(out_path)
+    xs = np.array([p.t[0] for p in poses], dtype=float)
+    ys = np.array([p.t[1] for p in poses], dtype=float)
+    zs = np.array([p.t[2] for p in poses], dtype=float)
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection="3d")
+
+    x_min, x_max = float(xs.min()), float(xs.max())
+    y_min, y_max = float(ys.min()), float(ys.max())
+    z_min, z_max = float(zs.min()), float(zs.max())
+    pad_x = max(0.1, (x_max - x_min) * 0.1)
+    pad_y = max(0.1, (y_max - y_min) * 0.1)
+    pad_z = max(0.1, (z_max - z_min) * 0.1)
+
+    ax.set_xlim(x_min - pad_x, x_max + pad_x)
+    ax.set_ylim(y_min - pad_y, y_max + pad_y)
+    ax.set_zlim(z_min - pad_z, z_max + pad_z)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_title("Camera Trajectory Animation")
+    ax.grid(True)
+
+    line, = ax.plot([], [], [], "b-", linewidth=1.6, label="trajectory")
+    point, = ax.plot([], [], [], "ro", markersize=5, label="current")
+    ax.legend()
+
+    def _update(frame_idx: int):
+        start = max(0, frame_idx - tail_length)
+        line.set_data(xs[start:frame_idx + 1], ys[start:frame_idx + 1])
+        line.set_3d_properties(zs[start:frame_idx + 1])
+        point.set_data([xs[frame_idx]], [ys[frame_idx]])
+        point.set_3d_properties([zs[frame_idx]])
+        return line, point
+
+    ani = FuncAnimation(fig, _update, frames=len(poses), interval=1000 / max(1, fps), blit=False)
+
+    saved_path = out_path
+    try:
+        # Preferred output: mp4 via ffmpeg
+        ani.save(str(out_path), writer="ffmpeg", fps=fps)
+    except Exception:
+        # Fallback to gif when ffmpeg is unavailable
+        saved_path = out_path.with_suffix(".gif")
+        ani.save(str(saved_path), writer="pillow", fps=fps)
+
+    plt.close(fig)
+    return saved_path
 
 
 def detect_jumps(

@@ -15,7 +15,7 @@ from vio_tool.board_detection import (
 from vio_tool.data_loader import load_camera_dataset
 from vio_tool.orbslam_interface import run_offline_orbslam
 from vio_tool.pose_math import load_traj_tum, save_traj_tum
-from vio_tool.visualization import detect_jumps, save_all_plots
+from vio_tool.visualization import detect_jumps, save_all_plots, save_trajectory_video
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,6 +37,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--traj_ws", default="", help="Existing WS trajectory path. Used when --run_slam is not set")
 
     p.add_argument("--plot", action="store_true", help="Generate plots")
+    p.add_argument("--video", action="store_true", help="Generate trajectory animation video (mp4/gif)")
+    p.add_argument("--video_fps", type=int, default=20, help="Animation FPS")
+    p.add_argument("--video_tail", type=int, default=120, help="Visible trajectory tail length in frames")
     p.add_argument("--jump_trans_thresh", type=float, default=0.2, help="Jump detection threshold in meters")
     p.add_argument("--jump_rot_thresh_deg", type=float, default=10.0, help="Jump detection threshold in degrees")
 
@@ -126,6 +129,15 @@ def main() -> None:
         result["jump_report_ws"] = str(jump_path)
         result["jump_count_ws"] = len(jumps)
 
+    if args.video:
+        video_ws = save_trajectory_video(
+            poses_ws,
+            out_dir / "traj_ws_animation.mp4",
+            fps=args.video_fps,
+            tail_length=args.video_tail,
+        )
+        result["video_ws"] = str(video_ws)
+
     if args.do_align:
         if not args.settings:
             raise ValueError("--settings is required for board detection")
@@ -175,6 +187,15 @@ def main() -> None:
         if args.plot:
             plot_paths_wm = save_all_plots(poses_wm, out_dir, prefix="traj_wm")
             result["plots_wm"] = {k: str(v) for k, v in plot_paths_wm.items()}
+
+        if args.video:
+            video_wm = save_trajectory_video(
+                poses_wm,
+                out_dir / "traj_wm_animation.mp4",
+                fps=args.video_fps,
+                tail_length=args.video_tail,
+            )
+            result["video_wm"] = str(video_wm)
 
     summary_path = out_dir / "run_summary.json"
     summary_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
