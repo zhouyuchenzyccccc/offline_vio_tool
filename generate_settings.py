@@ -138,6 +138,14 @@ Tbc: !!opencv-matrix
                  0.0, 0.0, 1.0, 0.0,
                  0.0, 0.0, 0.0, 1.0]
 
+# IMU noise parameters (from ORB-SLAM3 style defaults / EuRoC-like values)
+# These are required by IMU_RGBD parser. For pure RGBD path they are not used.
+IMU.Frequency: 200
+IMU.NoiseGyro: 1.7e-4
+IMU.NoiseAcc: 2.0e-3
+IMU.GyroWalk: 1.9393e-05
+IMU.AccWalk: 3.0e-03
+
 #--------------------------------------------------------------------------------------------
 # ORB Parameters
 #--------------------------------------------------------------------------------------------
