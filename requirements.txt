@@ -1,0 +1,5 @@
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+opencv-contrib-python>=4.8
+pupil-apriltags>=1.0.4.post10
