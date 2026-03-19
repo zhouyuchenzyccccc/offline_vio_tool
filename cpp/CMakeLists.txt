@@ -12,7 +12,6 @@ endif()
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
 find_package(Pangolin QUIET CONFIG)
 
 include_directories(
@@ -42,7 +41,6 @@ target_link_libraries(rgbd_inertial_offline
   ${ORB_SLAM3_LIB}
   ${OpenCV_LIBS}
   OpenGL::GL
-  GLEW::GLEW
 )
 
 # ORB-SLAM3 may depend on Pangolin symbols that are not re-exported by libORB_SLAM3
@@ -62,6 +60,7 @@ find_library(PANGO_DISPLAY_LIB NAMES pango_display)
 find_library(PANGO_OPENGL_LIB NAMES pango_opengl)
 find_library(PANGO_WINDOWING_LIB NAMES pango_windowing)
 find_library(PANGO_CORE_LIB NAMES pango_core)
+find_library(EPOXY_LIB NAMES epoxy)
 
 if(PANGO_DISPLAY_LIB)
   target_link_libraries(rgbd_inertial_offline ${PANGO_DISPLAY_LIB})
@@ -74,6 +73,9 @@ if(PANGO_WINDOWING_LIB)
 endif()
 if(PANGO_CORE_LIB)
   target_link_libraries(rgbd_inertial_offline ${PANGO_CORE_LIB})
+endif()
+if(EPOXY_LIB)
+  target_link_libraries(rgbd_inertial_offline ${EPOXY_LIB})
 endif()
 
 if(UNIX)
