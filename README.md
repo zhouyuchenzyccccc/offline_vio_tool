@@ -225,8 +225,8 @@ python run_vio.py \
   --sensor_mode rgbd \
   --run_slam \
   --orb_exec /home/ubuntu/WorkSpace/ZYC/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
-  --vocab /path/to/ORB-SLAM3/Vocabulary/ORBvoc.txt \
-  --settings /path/to/cam_settings.yaml \
+  --vocab /home/ubuntu/WorkSpace/ZYC/cam_pose/ORB-SLAM3/Vocabulary/ORBvoc.txt \
+  --settings /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test/camera_params.json \
   --out_dir /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test/output_cam_07 \
   --plot
 ```
