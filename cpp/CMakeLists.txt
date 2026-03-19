@@ -11,6 +11,8 @@ endif()
 
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
 
 include_directories(
   ${ORB_SLAM3_ROOT}
@@ -38,6 +40,8 @@ add_executable(rgbd_inertial_offline rgbd_inertial_offline.cc)
 target_link_libraries(rgbd_inertial_offline
   ${ORB_SLAM3_LIB}
   ${OpenCV_LIBS}
+  OpenGL::GL
+  GLEW::GLEW
 )
 
 if(UNIX)
