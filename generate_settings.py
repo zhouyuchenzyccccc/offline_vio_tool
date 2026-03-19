@@ -18,54 +18,49 @@ def generate_settings_yaml(camera_params_file, cam_id, output_yaml):
     
     Args:
         camera_params_file: Path to camera_params.json
-        cam_id: Camera ID (e.g., "07", "07_right", "7", etc.)
+        cam_id: Camera ID (e.g., "07", "7", "01", etc.)
         output_yaml: Output YAML file path
     """
-       
+    
     # Load camera parameters
     with open(camera_params_file, 'r') as f:
         params = json.load(f)
     
-    # Find camera entry (handle multiple id formats)
+    # Find camera entry - support various id formats
     cam_key = None
-    for key in params.get('cameras', {}).keys():
-        # Match 07 or cam_07 or camera_07 or 7
-        if str(cam_id) in str(key) or key.endswith(str(cam_id)):
+    cam_id_str = str(cam_id).lstrip('0') or '0'  # "07" -> "7", "01" -> "1"
+    
+    for key in params.keys():
+        key_normalized = str(key).lstrip('0') or '0'
+        if key_normalized == cam_id_str or str(key) == str(cam_id):
             cam_key = key
             break
     
     if not cam_key:
         raise ValueError(f"Camera {cam_id} not found in {camera_params_file}. "
-                         f"Available cameras: {list(params.get('cameras', {}).keys())}")
+                         f"Available cameras: {list(params.keys())}")
     
-    cam = params['cameras'][cam_key]
+    cam_data = params[cam_key]
     
-    # Extract intrinsics
-    # Common keys: fx, fy, cx, cy (or K[0,0], K[1,1], K[0,2], K[1,2])
-    if 'intrinsics' in cam:
-        intr = cam['intrinsics']
-        fx = intr.get('fx', intr.get('K', [[None]*3]*3)[0][0])
-        fy = intr.get('fy', intr.get('K', [[None]*3]*3)[1][1])
-        cx = intr.get('cx', intr.get('K', [[None]*3]*3)[0][2])
-        cy = intr.get('cy', intr.get('K', [[None]*3]*3)[1][2])
-    else:
-        fx = cam.get('fx')
-        fy = cam.get('fy')
-        cx = cam.get('cx')
-        cy = cam.get('cy')
+    # Extract RGB intrinsics from nested structure: cam_data['RGB']['intrinsic']
+    if 'RGB' not in cam_data:
+        raise ValueError(f"Camera {cam_id} has no 'RGB' key. Keys: {list(cam_data.keys())}")
+    
+    rgb = cam_data['RGB']
+    if 'intrinsic' not in rgb:
+        raise ValueError(f"Camera {cam_id} RGB has no 'intrinsic' key. Keys: {list(rgb.keys())}")
+    
+    intr = rgb['intrinsic']
+    fx = intr.get('fx')
+    fy = intr.get('fy')
+    cx = intr.get('cx')
+    cy = intr.get('cy')
     
     if None in [fx, fy, cx, cy]:
         raise ValueError(f"Missing intrinsics for camera {cam_id}: fx={fx}, fy={fy}, cx={cx}, cy={cy}")
     
-    # Extract distortion parameters
-    # Common formats: k1, k2, k3, p1, p2 (OpenCV 5-param model)
-    dist = cam.get('distortion', {})
-    k1 = dist.get('k1', 0.0)
-    k2 = dist.get('k2', 0.0)
-    k3 = dist.get('k3', 0.0)
-    p1 = dist.get('p1', 0.0)
-    p2 = dist.get('p2', 0.0)
-    
+    # Extract distortion parameters from RGB.distortion
+    dist = rgb.get('distortion', {})
     # Generate YAML content
     yaml_content = f"""%YAML:1.0
 
