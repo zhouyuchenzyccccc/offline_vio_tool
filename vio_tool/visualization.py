@@ -5,6 +5,7 @@ from pathlib import Path
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 
 from .pose_math import Pose, pose_deltas, to_euler_xyz_deg
 
@@ -161,9 +162,27 @@ def save_trajectory_video(
         # Preferred output: mp4 via ffmpeg
         ani.save(str(out_path), writer="ffmpeg", fps=fps)
     except Exception:
-        # Fallback to gif when ffmpeg is unavailable
+        # Reliable fallback: render each frame and encode an animated GIF.
         saved_path = out_path.with_suffix(".gif")
-        ani.save(str(saved_path), writer="pillow", fps=fps)
+        frames: list[Image.Image] = []
+        for i in range(len(poses)):
+            _update(i)
+            fig.canvas.draw()
+            w, h = fig.canvas.get_width_height()
+            buf = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8).reshape((h, w, 4))
+            frames.append(Image.fromarray(buf[:, :, :3].copy(), mode="RGB"))
+
+        if not frames:
+            raise RuntimeError("No frames generated for GIF")
+
+        frames[0].save(
+            str(saved_path),
+            save_all=True,
+            append_images=frames[1:],
+            duration=max(1, int(round(1000 / max(1, fps)))),
+            loop=0,
+            optimize=False,
+        )
 
     plt.close(fig)
     return saved_path
