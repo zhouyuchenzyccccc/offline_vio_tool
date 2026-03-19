@@ -109,7 +109,7 @@ Camera.RGB: 0
 
 # For pinhole models, Bf = baseline * fx (in pixels)
 # For RGB-D without stereo, set to 0
-Camera.bf: 0
+Camera.bf: 0.0
 
 #--------------------------------------------------------------------------------------------
 # Depth Parameters (RGB-D)
@@ -118,7 +118,7 @@ Camera.bf: 0
 # DepthMapFactor: scales depth values
 # For Realsense (millimeters): 1000
 # For normalized [0,1]: 1
-Camera.DepthMapFactor: 1000.0
+DepthMapFactor: 1000.0
 
 # Maximum depth to be considered valid (meters)
 ThDepth: 40.0
@@ -127,20 +127,16 @@ ThDepth: 40.0
 # IMU Parameters (not used in RGBD-only mode)
 #--------------------------------------------------------------------------------------------
 
-# Camera-IMU Transformation Matrix (if no IMU, use identity or this will be ignored)
-# Tbc: SE(3) transform from camera to IMU frame
-# Format: 
-#   Tbc.tx: translation x
-#   Tbc.ty: translation y
-#   Tbc.tz: translation z
-#   Tbc.qx, Tbc.qy, Tbc.qz, Tbc.qw: rotation quaternion (identity for no extrinsic)
-Tbc.tx: 0.0
-Tbc.ty: 0.0
-Tbc.tz: 0.0
-Tbc.qx: 0.0
-Tbc.qy: 0.0
-Tbc.qz: 0.0
-Tbc.qw: 1.0
+# Camera-IMU Transformation Matrix
+# Even in RGB-D mode, some builds still validate this key.
+Tbc: !!opencv-matrix
+    rows: 4
+    cols: 4
+    dt: f
+    data: [1.0, 0.0, 0.0, 0.0,
+                 0.0, 1.0, 0.0, 0.0,
+                 0.0, 0.0, 1.0, 0.0,
+                 0.0, 0.0, 0.0, 1.0]
 
 #--------------------------------------------------------------------------------------------
 # ORB Parameters
