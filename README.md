@@ -135,7 +135,7 @@ Package purpose:
 
 ### 8.1 Dataset folder
 
-Expected format:
+Supported formats:
 
 ```text
 dataset/
@@ -144,6 +144,12 @@ dataset/
       rgb/
       depth/
       imu.csv
+
+    01/
+      RGB/
+      Depth/
+      IMU/
+        imu.csv
 ```
 
 Supported image extensions:

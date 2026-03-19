@@ -29,12 +29,26 @@ def _collect_images(folder: Path) -> list[Path]:
     files: list[Path] = []
     for ext in _IMG_EXTS:
         files.extend(folder.glob(ext))
-    files = sorted(files, key=lambda p: p.stem)
+    def _sort_key(p: Path):
+        try:
+            return (0, int(p.stem))
+        except ValueError:
+            return (1, p.stem)
+
+    files = sorted(files, key=_sort_key)
     return files
 
 
 def _to_stem_map(paths: Sequence[Path]) -> dict[str, Path]:
     return {p.stem: p for p in paths}
+
+
+def _first_existing(base: Path, rel_candidates: Sequence[str]) -> Path | None:
+    for rel in rel_candidates:
+        p = base / rel
+        if p.exists():
+            return p
+    return None
 
 
 def _frame_time_from_index(stem: str, fallback_step: float, idx: int) -> float:
@@ -50,12 +64,18 @@ def load_camera_dataset(dataset_root: str | Path, cam_id: str, max_frames: int |
     if not cam_dir.exists():
         raise FileNotFoundError(f"Camera directory not found: {cam_dir}")
 
-    rgb_dir = cam_dir / "rgb"
-    depth_dir = cam_dir / "depth"
-    imu_csv = cam_dir / "imu.csv"
+    # Backward-compatible path probing:
+    # - old style: cam_xx/rgb, cam_xx/depth, cam_xx/imu.csv
+    # - new style: 01/RGB, 01/Depth, 01/IMU/imu.csv
+    rgb_dir = _first_existing(cam_dir, ["rgb", "RGB", "color", "Color"])
+    depth_dir = _first_existing(cam_dir, ["depth", "Depth"])
+    imu_csv = _first_existing(cam_dir, ["imu.csv", "IMU/imu.csv", "imu/imu.csv", "IMU/IMU.csv", "imu/IMU.csv"])
 
-    if not rgb_dir.exists() or not depth_dir.exists() or not imu_csv.exists():
-        raise FileNotFoundError("Expected cam folder to contain rgb/, depth/, imu.csv")
+    if rgb_dir is None or depth_dir is None or imu_csv is None:
+        raise FileNotFoundError(
+            "Expected camera folder to contain RGB/depth image folders and IMU csv. "
+            "Supported examples: 'cam_01/rgb depth imu.csv' or '01/RGB Depth IMU/imu.csv'."
+        )
 
     rgb_paths = _collect_images(rgb_dir)
     depth_paths = _collect_images(depth_dir)
