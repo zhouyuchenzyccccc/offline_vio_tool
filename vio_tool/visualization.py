@@ -6,6 +6,7 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+import cv2
 
 from .pose_math import Pose, pose_deltas, to_euler_xyz_deg
 
@@ -186,6 +187,88 @@ def save_trajectory_video(
 
     plt.close(fig)
     return saved_path
+
+
+def save_overlay_video(
+    frames,
+    poses: list[Pose],
+    out_path: str | Path,
+    fps: int = 20,
+) -> Path:
+    if not frames:
+        raise ValueError("No RGB frames to visualize")
+    if not poses:
+        raise ValueError("No poses to visualize")
+
+    out_path = Path(out_path)
+
+    # Precompute trajectory map extents in X-Z plane for a compact top-view inset.
+    tx = np.array([p.t[0] for p in poses], dtype=float)
+    tz = np.array([p.t[2] for p in poses], dtype=float)
+    x_min, x_max = float(tx.min()), float(tx.max())
+    z_min, z_max = float(tz.min()), float(tz.max())
+    span_x = max(1e-6, x_max - x_min)
+    span_z = max(1e-6, z_max - z_min)
+
+    first = cv2.imread(str(frames[0].rgb_path), cv2.IMREAD_COLOR)
+    if first is None:
+        raise RuntimeError(f"Cannot read frame: {frames[0].rgb_path}")
+    h, w = first.shape[:2]
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(out_path), fourcc, float(max(1, fps)), (w, h))
+    if not writer.isOpened():
+        raise RuntimeError(f"Cannot open video writer: {out_path}")
+
+    pose_ts = np.array([p.timestamp for p in poses], dtype=float)
+
+    def nearest_pose(ts: float) -> Pose:
+        idx = int(np.searchsorted(pose_ts, ts))
+        if idx <= 0:
+            return poses[0]
+        if idx >= len(poses):
+            return poses[-1]
+        if abs(pose_ts[idx] - ts) < abs(ts - pose_ts[idx - 1]):
+            return poses[idx]
+        return poses[idx - 1]
+
+    for fr in frames:
+        img = cv2.imread(str(fr.rgb_path), cv2.IMREAD_COLOR)
+        if img is None:
+            continue
+
+        p = nearest_pose(float(fr.timestamp))
+        ex, ey, ez = to_euler_xyz_deg(p.q_xyzw)
+
+        # Main HUD text
+        cv2.putText(img, f"t={fr.timestamp:.3f}s", (20, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (40, 255, 40), 2)
+        cv2.putText(img, f"pos[m]: x={p.t[0]:.3f} y={p.t[1]:.3f} z={p.t[2]:.3f}", (20, 72), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+        cv2.putText(img, f"rpy[deg]: {ex:.1f}, {ey:.1f}, {ez:.1f}", (20, 106), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+
+        # Top-view inset (X-Z).
+        inset_w = max(220, int(w * 0.28))
+        inset_h = max(160, int(h * 0.28))
+        ox = w - inset_w - 16
+        oy = 16
+        cv2.rectangle(img, (ox, oy), (ox + inset_w, oy + inset_h), (32, 32, 32), -1)
+        cv2.rectangle(img, (ox, oy), (ox + inset_w, oy + inset_h), (220, 220, 220), 1)
+
+        for i in range(len(poses) - 1):
+            x0 = int((poses[i].t[0] - x_min) / span_x * (inset_w - 20)) + ox + 10
+            z0 = int((poses[i].t[2] - z_min) / span_z * (inset_h - 20)) + oy + 10
+            x1 = int((poses[i + 1].t[0] - x_min) / span_x * (inset_w - 20)) + ox + 10
+            z1 = int((poses[i + 1].t[2] - z_min) / span_z * (inset_h - 20)) + oy + 10
+            cv2.line(img, (x0, z0), (x1, z1), (80, 180, 255), 1, cv2.LINE_AA)
+
+        cx = int((p.t[0] - x_min) / span_x * (inset_w - 20)) + ox + 10
+        cz = int((p.t[2] - z_min) / span_z * (inset_h - 20)) + oy + 10
+        cv2.circle(img, (cx, cz), 4, (0, 0, 255), -1, cv2.LINE_AA)
+        cv2.putText(img, "Top view (X-Z)", (ox + 10, oy + inset_h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (230, 230, 230), 1)
+
+        writer.write(img)
+
+    writer.release()
+    return out_path
 
 
 def detect_jumps(
