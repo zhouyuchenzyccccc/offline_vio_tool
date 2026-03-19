@@ -70,73 +70,111 @@ def generate_settings_yaml(camera_params_file, cam_id, output_yaml):
     # Generate YAML content
     yaml_content = f"""%YAML:1.0
 
-# Camera calibration parameters for ORB-SLAM3
+# Camera calibration parameters for ORB-SLAM3 RGB-D
 # Generated from {Path(camera_params_file).name}
 # Camera ID: {cam_id}
 
-# Camera calibration and distortion parameters (OpenCV model)
+#--------------------------------------------------------------------------------------------
+# Camera Parameters
+#--------------------------------------------------------------------------------------------
+
+# Camera type: PinHole or KannalaBrandt8
 Camera.type: "PinHole"
 
-# Camera.fx: focal length in x with value in pixels
-Camera.fx: {fx}
-
-# Camera.fy: focal length in y with value in pixels
-Camera.fy: {fy}
-
-# Camera.cx: principal point x coordinate in pixels
-Camera.cx: {cx}
-
-# Camera.cy: principal point y coordinate in pixels
-Camera.cy: {cy}
-
-# Camera.k1: distortion parameter k1
-Camera.k1: {k1}
-
-# Camera.k2: distortion parameter k2
-Camera.k2: {k2}
-
-# Camera.p1: distortion parameter p1
-Camera.p1: {p1}
-
-# Camera.p2: distortion parameter p2
-Camera.p2: {p2}
-
-# Camera.k3: distortion parameter k3
-Camera.k3: {k3}
-
-# Camera distortion model - use "opencv" for k1,k2,p1,p2,k3
-Camera.distortionModel: "opencv"
-
-# DepthMapFactor: "1/DepthMapFactor" is the depth value in meters
-# For Realsense in millimeters: DepthMapFactor = 1000
-# For normalized depth [0,1]: DepthMapFactor = 1
-Camera.DepthMapFactor: 1000.0
-
-# RGB-D camera resolution (example, adjust as needed)
+# Camera resolution
 Camera.width: 1280
 Camera.height: 800
 
-# Viewer parameters
-# These are for GUI visualization, use default values if --no-viewer is used
+# Camera intrinsics (OpenCV model)
+Camera.fx: {fx}
+Camera.fy: {fy}
+Camera.cx: {cx}
+Camera.cy: {cy}
+
+# Distortion parameters (k1, k2, p1, p2, k3)
+Camera.k1: {k1}
+Camera.k2: {k2}
+Camera.p1: {p1}
+Camera.p2: {p2}
+Camera.k3: {k3}
+
+# Distortion model: opencv for 5-param model
+Camera.distortionModel: "opencv"
+
+# Camera frames per second
+Camera.fps: 30
+
+# Color order of the images (0: BGR, 1: RGB). It is ignored if the input is a video file
+Camera.RGB: 0
+
+# For pinhole models, Bf = baseline * fx (in pixels)
+# For RGB-D without stereo, set to 0
+Camera.bf: 0
+
+#--------------------------------------------------------------------------------------------
+# Depth Parameters (RGB-D)
+#--------------------------------------------------------------------------------------------
+
+# DepthMapFactor: scales depth values
+# For Realsense (millimeters): 1000
+# For normalized [0,1]: 1
+Camera.DepthMapFactor: 1000.0
+
+# Maximum depth to be considered valid (meters)
+ThDepth: 40.0
+
+#--------------------------------------------------------------------------------------------
+# IMU Parameters (not used in RGBD-only mode)
+#--------------------------------------------------------------------------------------------
+
+# Camera-IMU Transformation Matrix (if no IMU, use identity or this will be ignored)
+# Tbc: SE(3) transform from camera to IMU frame
+# Format: 
+#   Tbc.tx: translation x
+#   Tbc.ty: translation y
+#   Tbc.tz: translation z
+#   Tbc.qx, Tbc.qy, Tbc.qz, Tbc.qw: rotation quaternion (identity for no extrinsic)
+Tbc.tx: 0.0
+Tbc.ty: 0.0
+Tbc.tz: 0.0
+Tbc.qx: 0.0
+Tbc.qy: 0.0
+Tbc.qz: 0.0
+Tbc.qw: 1.0
+
+#--------------------------------------------------------------------------------------------
+# ORB Parameters
+#--------------------------------------------------------------------------------------------
+
+# ORB Extractor: Number of features per image
+ORBextractor.nFeatures: 1000
+
+# ORB Extractor: Scale factor between levels in the scale pyramid
+ORBextractor.scaleFactor: 1.2
+
+# ORB Extractor: Number of levels in the scale pyramid
+ORBextractor.nLevels: 8
+
+# ORB Extractor: Fast threshold
+# Image is divided in a grid. At each cell FAST is applied. If no corners are found in a cell then
+# its threshold is lowered.
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+
+#--------------------------------------------------------------------------------------------
+# Viewer Parameters
+#--------------------------------------------------------------------------------------------
+
 Viewer.KeyFrameSize: 0.05
-Viewer.KeyFrameLineWidth: 1
+Viewer.KeyFrameLineWidth: 1.0
 Viewer.GraphLineWidth: 0.9
-Viewer.PointSize: 2
+Viewer.PointSize: 2.0
 Viewer.CameraSize: 0.08
-Viewer.CameraLineWidth: 3
+Viewer.CameraLineWidth: 3.0
 Viewer.ViewpointX: 0
 Viewer.ViewpointY: -0.7
 Viewer.ViewpointZ: -1.8
 Viewer.ViewpointF: 500
-
-# Feature detection parameters
-ORBextractor.nFeatures: 1000
-ORBextractor.scaleFactor: 1.2
-ORBextractor.nLevels: 8
-ORBextractor.fIniThFAST: 20
-ORBextractor.fMinThFAST: 7
-
-# Viewer refresh rate
 Viewer.fps: 30
 """
     
