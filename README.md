@@ -204,14 +204,15 @@ Plain-text 4x4 matrix is also accepted.
 
 ```bash
 python run_vio.py \
-  --dataset /data/dataset/IMU_test \
-  --cam_id cam_01 \
+  --dataset /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test \
+  --cam_id 07 \
+  --sensor_mode rgbd \
   --run_slam \
-  --orb_exec /path/to/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
+  --orb_exec /home/ubuntu/WorkSpace/ZYC/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
   --vocab /path/to/ORB-SLAM3/Vocabulary/ORBvoc.txt \
   --settings /path/to/cam_settings.yaml \
-  --out_dir /tmp/vio_cam01 \
-  --max_frames 300 \
+  --out_dir /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test/output_cam_07_smoke \
+  --max_frames 100 \
   --plot
 ```
 
@@ -219,13 +220,14 @@ python run_vio.py \
 
 ```bash
 python run_vio.py \
-  --dataset /data/dataset/IMU_test \
-  --cam_id cam_01 \
+  --dataset /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test \
+  --cam_id 07 \
+  --sensor_mode rgbd \
   --run_slam \
-  --orb_exec /path/to/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
+  --orb_exec /home/ubuntu/WorkSpace/ZYC/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
   --vocab /path/to/ORB-SLAM3/Vocabulary/ORBvoc.txt \
   --settings /path/to/cam_settings.yaml \
-  --out_dir /data/outputs/cam_01 \
+  --out_dir /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test/output_cam_07 \
   --plot
 ```
 
@@ -235,13 +237,13 @@ ArUco mode:
 
 ```bash
 python run_vio.py \
-  --dataset /data/dataset/IMU_test \
-  --cam_id cam_01 \
+  --dataset /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test \
+  --cam_id 07 \
   --run_slam \
-  --orb_exec /path/to/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
+  --orb_exec /home/ubuntu/WorkSpace/ZYC/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
   --vocab /path/to/ORB-SLAM3/Vocabulary/ORBvoc.txt \
   --settings /path/to/cam_settings.yaml \
-  --out_dir /data/outputs/cam_01 \
+  --out_dir /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test/output_cam_07_align_aruco \
   --plot \
   --do_align \
   --board_type aruco \
@@ -256,13 +258,13 @@ AprilTag mode:
 
 ```bash
 python run_vio.py \
-  --dataset /data/dataset/IMU_test \
-  --cam_id cam_01 \
+  --dataset /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test \
+  --cam_id 07 \
   --run_slam \
-  --orb_exec /path/to/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
+  --orb_exec /home/ubuntu/WorkSpace/ZYC/cam_pose/offline_vio_tool/build/rgbd_inertial_offline \
   --vocab /path/to/ORB-SLAM3/Vocabulary/ORBvoc.txt \
   --settings /path/to/cam_settings.yaml \
-  --out_dir /data/outputs/cam_01 \
+  --out_dir /home/ubuntu/WorkSpace/ZYC/dataset/IMU_test/output_cam_07_align_apriltag \
   --plot \
   --do_align \
   --board_type apriltag \
@@ -272,6 +274,36 @@ python run_vio.py \
   --board_frame_index 000123 \
   --t_wmb_file /data/calib/T_WmB.json
 ```
+
+### 9.4 Option meanings and command differences
+
+- What is `--settings`:
+  - It is the ORB-SLAM3 camera configuration YAML (intrinsics and related camera params).
+  - It is used in two places:
+    - ORB-SLAM3 tracking itself (RGB-D-Inertial pipeline).
+    - Board pose solving (Aruco/AprilTag) to read `fx fy cx cy`.
+
+- What is `--sensor_mode`:
+  - `imu_rgbd`: uses RGB + Depth + IMU (default).
+  - `rgbd`: uses RGB + Depth only (recommended first validation when IMU extrinsic/noise are not calibrated).
+
+- Does this include camera calibration:
+  - The commands do not run a calibration optimizer.
+  - They use existing calibration results from your `cam_settings.yaml`.
+  - If `--do_align` is enabled, the pipeline additionally estimates board pose in one frame and computes world alignment transform.
+
+- Difference among commands:
+  - `9.1 Quick smoke test`:
+    - Runs first N frames (`--max_frames`) for quick debugging.
+    - Output is mainly for fast validation.
+  - `9.2 Full offline run (Ws)`:
+    - Runs full sequence.
+    - Outputs trajectory in SLAM world: `traj_ws.txt`.
+    - No world alignment.
+  - `9.3 Full run with world alignment (Wm)`:
+    - Runs full sequence + board detection + world transform solve.
+    - Outputs `traj_wm.txt` in multi-camera world.
+    - `aruco` and `apriltag` modes only differ in board detector backend.
 
 ## 10. Output Files
 
@@ -298,7 +330,7 @@ Trajectory format (TUM-like):
 Replace each path variable, then run:
 
 ```bash
-ORB_ROOT=/path/to/ORB-SLAM3 TOOL_ROOT=/path/to/cam_pose/offline_vio_tool DATASET=/path/to/dataset/IMU_test CAM_ID=cam_01 SETTINGS=/path/to/cam_settings.yaml T_WMB=/path/to/T_WmB.json OUT=/path/to/outputs/cam_01 bash -lc 'python3 -m pip install -r "$TOOL_ROOT/requirements.txt" && cmake -S "$TOOL_ROOT/cpp" -B "$TOOL_ROOT/build" -DORB_SLAM3_ROOT="$ORB_ROOT" && cmake --build "$TOOL_ROOT/build" -j && python3 "$TOOL_ROOT/run_vio.py" --dataset "$DATASET" --cam_id "$CAM_ID" --run_slam --orb_exec "$TOOL_ROOT/build/rgbd_inertial_offline" --vocab "$ORB_ROOT/Vocabulary/ORBvoc.txt" --settings "$SETTINGS" --out_dir "$OUT" --plot --do_align --board_type aruco --board_size_m 0.08 --aruco_dict DICT_4X4_50 --marker_id 0 --board_frame_index 000123 --t_wmb_file "$T_WMB"'
+ORB_ROOT=/path/to/ORB-SLAM3 TOOL_ROOT=/home/ubuntu/WorkSpace/ZYC/cam_pose/offline_vio_tool DATASET=/home/ubuntu/WorkSpace/ZYC/dataset/IMU_test CAM_ID=07 SETTINGS=/path/to/cam_settings.yaml T_WMB=/path/to/T_WmB.json OUT=/home/ubuntu/WorkSpace/ZYC/dataset/IMU_test/output_cam_07_oneliner bash -lc 'python3 -m pip install -r "$TOOL_ROOT/requirements.txt" && cmake -S "$TOOL_ROOT/cpp" -B "$TOOL_ROOT/build" -DORB_SLAM3_ROOT="$ORB_ROOT" && cmake --build "$TOOL_ROOT/build" -j && python3 "$TOOL_ROOT/run_vio.py" --dataset "$DATASET" --cam_id "$CAM_ID" --run_slam --orb_exec "$TOOL_ROOT/build/rgbd_inertial_offline" --vocab "$ORB_ROOT/Vocabulary/ORBvoc.txt" --settings "$SETTINGS" --out_dir "$OUT" --plot --do_align --board_type aruco --board_size_m 0.08 --aruco_dict DICT_4X4_50 --marker_id 0 --board_frame_index 000123 --t_wmb_file "$T_WMB"'
 ```
 
 ## 12. Troubleshooting

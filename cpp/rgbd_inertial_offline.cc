@@ -68,7 +68,7 @@ static bool readImu(const std::string &path, std::vector<ImuItem> &out) {
 
 int main(int argc, char **argv) {
     if (argc < 6) {
-        std::cerr << "Usage: rgbd_inertial_offline <vocab> <settings> <assoc_txt> <imu_txt> <traj_out> [--no-viewer] [--depth-scale 1000]" << std::endl;
+        std::cerr << "Usage: rgbd_inertial_offline <vocab> <settings> <assoc_txt> <imu_txt> <traj_out> [--sensor-mode imu_rgbd|rgbd] [--no-viewer] [--depth-scale 1000]" << std::endl;
         return 1;
     }
 
@@ -80,10 +80,21 @@ int main(int argc, char **argv) {
 
     bool use_viewer = true;
     double depth_scale = 1000.0;
+    std::string sensor_mode = "imu_rgbd";
 
     for (int i = 6; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "--no-viewer") {
+        if (a == "--sensor-mode") {
+            if (i + 1 >= argc) {
+                std::cerr << "--sensor-mode requires a value" << std::endl;
+                return 1;
+            }
+            sensor_mode = argv[++i];
+            if (sensor_mode != "imu_rgbd" && sensor_mode != "rgbd") {
+                std::cerr << "Unsupported --sensor-mode: " << sensor_mode << std::endl;
+                return 1;
+            }
+        } else if (a == "--no-viewer") {
             use_viewer = false;
         } else if (a == "--depth-scale") {
             if (i + 1 >= argc) {
@@ -104,11 +115,18 @@ int main(int argc, char **argv) {
     if (!readImageList(assoc_txt, images)) {
         return 2;
     }
-    if (!readImu(imu_txt, imu)) {
-        return 3;
+
+    if (sensor_mode == "imu_rgbd") {
+        if (!readImu(imu_txt, imu)) {
+            return 3;
+        }
     }
 
-    ORB_SLAM3::System slam(vocab, settings, ORB_SLAM3::System::IMU_RGBD, use_viewer);
+    ORB_SLAM3::System::eSensor sensor = ORB_SLAM3::System::IMU_RGBD;
+    if (sensor_mode == "rgbd") {
+        sensor = ORB_SLAM3::System::RGBD;
+    }
+    ORB_SLAM3::System slam(vocab, settings, sensor, use_viewer);
 
     size_t imu_idx = 0;
     double last_t = -1.0;
@@ -137,16 +155,19 @@ int main(int argc, char **argv) {
             depth_raw.convertTo(depth, CV_32F);
         }
 
-        std::vector<ORB_SLAM3::IMU::Point> vImu;
-        while (imu_idx < imu.size() && imu[imu_idx].t <= frm.t) {
-            if (imu[imu_idx].t > last_t) {
-                const ImuItem &m = imu[imu_idx];
-                vImu.emplace_back(m.ax, m.ay, m.az, m.gx, m.gy, m.gz, m.t);
+        if (sensor_mode == "imu_rgbd") {
+            std::vector<ORB_SLAM3::IMU::Point> vImu;
+            while (imu_idx < imu.size() && imu[imu_idx].t <= frm.t) {
+                if (imu[imu_idx].t > last_t) {
+                    const ImuItem &m = imu[imu_idx];
+                    vImu.emplace_back(m.ax, m.ay, m.az, m.gx, m.gy, m.gz, m.t);
+                }
+                ++imu_idx;
             }
-            ++imu_idx;
+            slam.TrackRGBD(rgb, depth, frm.t, vImu);
+        } else {
+            slam.TrackRGBD(rgb, depth, frm.t);
         }
-
-        slam.TrackRGBD(rgb, depth, frm.t, vImu);
         last_t = frm.t;
 
         if ((i + 1) % 100 == 0) {

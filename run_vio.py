@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--vocab", default="", help="Path to ORBvoc.txt")
     p.add_argument("--settings", default="", help="Path to ORB-SLAM3 camera yaml")
     p.add_argument("--depth_scale", type=float, default=1000.0, help="Depth png scale to meter, e.g. 1000")
+    p.add_argument("--sensor_mode", choices=["imu_rgbd", "rgbd"], default="imu_rgbd", help="SLAM sensor mode")
     p.add_argument("--use_viewer", action="store_true", help="Enable ORB-SLAM3 viewer")
 
     p.add_argument("--traj_ws", default="", help="Existing WS trajectory path. Used when --run_slam is not set")
@@ -92,6 +93,7 @@ def main() -> None:
             imu_samples=cam_data.imu_samples,
             out_dir=out_dir,
             depth_scale=args.depth_scale,
+            sensor_mode=args.sensor_mode,
             no_viewer=not args.use_viewer,
         )
         traj_ws_path = run_res.trajectory_path

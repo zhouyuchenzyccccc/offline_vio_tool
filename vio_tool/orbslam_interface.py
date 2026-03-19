@@ -32,6 +32,7 @@ def run_offline_orbslam(
     imu_samples: list[ImuSample],
     out_dir: str | Path,
     depth_scale: float = 1000.0,
+    sensor_mode: str = "imu_rgbd",
     no_viewer: bool = True,
 ) -> OrbRunResult:
     out_dir = Path(out_dir)
@@ -52,6 +53,8 @@ def run_offline_orbslam(
         str(assoc_path),
         str(imu_txt_path),
         str(traj_path),
+        "--sensor-mode",
+        str(sensor_mode),
         "--depth-scale",
         str(depth_scale),
     ]
