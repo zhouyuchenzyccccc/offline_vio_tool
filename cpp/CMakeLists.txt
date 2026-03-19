@@ -10,12 +10,15 @@ if(NOT ORB_SLAM3_ROOT)
 endif()
 
 find_package(OpenCV REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 include_directories(
   ${ORB_SLAM3_ROOT}
   ${ORB_SLAM3_ROOT}/include
   ${ORB_SLAM3_ROOT}/include/CameraModels
   ${ORB_SLAM3_ROOT}/Thirdparty/Sophus
+  ${EIGEN3_INCLUDE_DIR}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 find_library(ORB_SLAM3_LIB
