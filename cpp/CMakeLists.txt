@@ -13,6 +13,7 @@ find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
+find_package(Pangolin QUIET CONFIG)
 
 include_directories(
   ${ORB_SLAM3_ROOT}
@@ -43,6 +44,37 @@ target_link_libraries(rgbd_inertial_offline
   OpenGL::GL
   GLEW::GLEW
 )
+
+# ORB-SLAM3 may depend on Pangolin symbols that are not re-exported by libORB_SLAM3
+# on newer linkers, so we link Pangolin explicitly.
+if(Pangolin_FOUND)
+  message(STATUS "Using Pangolin from CMake package")
+  if(DEFINED Pangolin_INCLUDE_DIRS)
+    target_include_directories(rgbd_inertial_offline PRIVATE ${Pangolin_INCLUDE_DIRS})
+  endif()
+  if(DEFINED Pangolin_LIBRARIES)
+    target_link_libraries(rgbd_inertial_offline ${Pangolin_LIBRARIES})
+  endif()
+endif()
+
+# Fallback for new Pangolin installs that export pango_* libraries.
+find_library(PANGO_DISPLAY_LIB NAMES pango_display)
+find_library(PANGO_OPENGL_LIB NAMES pango_opengl)
+find_library(PANGO_WINDOWING_LIB NAMES pango_windowing)
+find_library(PANGO_CORE_LIB NAMES pango_core)
+
+if(PANGO_DISPLAY_LIB)
+  target_link_libraries(rgbd_inertial_offline ${PANGO_DISPLAY_LIB})
+endif()
+if(PANGO_OPENGL_LIB)
+  target_link_libraries(rgbd_inertial_offline ${PANGO_OPENGL_LIB})
+endif()
+if(PANGO_WINDOWING_LIB)
+  target_link_libraries(rgbd_inertial_offline ${PANGO_WINDOWING_LIB})
+endif()
+if(PANGO_CORE_LIB)
+  target_link_libraries(rgbd_inertial_offline ${PANGO_CORE_LIB})
+endif()
 
 if(UNIX)
   target_link_libraries(rgbd_inertial_offline pthread)
