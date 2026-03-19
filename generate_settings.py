@@ -61,6 +61,12 @@ def generate_settings_yaml(camera_params_file, cam_id, output_yaml):
     
     # Extract distortion parameters from RGB.distortion
     dist = rgb.get('distortion', {})
+    k1 = dist.get('k1', 0.0)
+    k2 = dist.get('k2', 0.0)
+    k3 = dist.get('k3', 0.0)
+    p1 = dist.get('p1', 0.0)
+    p2 = dist.get('p2', 0.0)
+    
     # Generate YAML content
     yaml_content = f"""%YAML:1.0
 
