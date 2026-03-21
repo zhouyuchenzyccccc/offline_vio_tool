@@ -69,7 +69,21 @@ def load_camera_dataset(dataset_root: str | Path, cam_id: str, max_frames: int |
     # - new style: 01/RGB, 01/Depth, 01/IMU/imu.csv
     rgb_dir = _first_existing(cam_dir, ["rgb", "RGB", "color", "Color"])
     depth_dir = _first_existing(cam_dir, ["depth", "Depth"])
-    imu_csv = _first_existing(cam_dir, ["imu.csv", "IMU/imu.csv", "imu/imu.csv", "IMU/IMU.csv", "imu/IMU.csv"])
+    imu_csv = _first_existing(
+        cam_dir,
+        [
+            "imu_raw.csv",
+            "imu.csv",
+            "IMU/imu_raw.csv",
+            "imu/imu_raw.csv",
+            "IMU/IMU_RAW.csv",
+            "imu/IMU_RAW.csv",
+            "IMU/imu.csv",
+            "imu/imu.csv",
+            "IMU/IMU.csv",
+            "imu/IMU.csv",
+        ],
+    )
 
     if rgb_dir is None or depth_dir is None or imu_csv is None:
         raise FileNotFoundError(
