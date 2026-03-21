@@ -146,6 +146,7 @@ def main() -> None:
         "num_poses": len(poses_ws),
         "loaded_frames": len(cam_data.frames),
         "loaded_imu_samples": len(cam_data.imu_samples),
+        "requested_sensor_mode": args.sensor_mode,
     }
 
     if args.run_slam:
@@ -155,7 +156,12 @@ def main() -> None:
             result["processed_frames"] = processed_frames
 
         if args.sensor_mode == "rgbd" and actual_sensor is not None and "RGB-D-Inertial" in actual_sensor:
-            print("Warning: Requested --sensor_mode rgbd but runtime reports RGB-D-Inertial.")
+            raise RuntimeError(
+                "Requested --sensor_mode rgbd, but runtime reports RGB-D-Inertial. "
+                "This usually means your executable does not honor --sensor-mode yet (stale build). "
+                "Please rebuild ./build/rgbd_inertial_offline from offline_vio_tool/cpp and rerun. "
+                "See orbslam_run.log for the exact command and startup banner."
+            )
 
         if len(poses_ws) < max(10, int(0.1 * max(1, len(cam_data.frames)))):
             print("Warning: Trajectory is very short compared with loaded frames. Check orbslam_run.log for resets/lost tracking.")
