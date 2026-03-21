@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 from vio_tool.alignment import convert_traj_to_wm, estimate_T_wm_ws, load_transform_file
@@ -96,6 +97,8 @@ def main() -> None:
     max_frames = args.max_frames if args.max_frames > 0 else None
     cam_data = load_camera_dataset(args.dataset, args.cam_id, max_frames=max_frames)
 
+    print(f"Loaded dataset: frames={len(cam_data.frames)}, imu_samples={len(cam_data.imu_samples)}")
+
     if args.run_slam:
         required = [args.orb_exec, args.vocab, args.settings]
         if not all(required):
@@ -113,6 +116,22 @@ def main() -> None:
             no_viewer=not args.use_viewer,
         )
         traj_ws_path = run_res.trajectory_path
+
+        # Parse key runtime stats from ORB-SLAM3 log for quick diagnosis.
+        actual_sensor = None
+        processed_frames = None
+        try:
+            log_text = run_res.log_path.read_text(encoding="utf-8", errors="ignore")
+            m_sensor = re.search(r"Input sensor was set to:\s*([^\n\r]+)", log_text)
+            if m_sensor:
+                actual_sensor = m_sensor.group(1).strip()
+
+            all_processed = re.findall(r"Processed frames:\s*(\d+)/(\d+)", log_text)
+            if all_processed:
+                last = all_processed[-1]
+                processed_frames = {"done": int(last[0]), "total": int(last[1])}
+        except Exception:
+            pass
     else:
         if not args.traj_ws:
             raise ValueError("Provide --traj_ws when not using --run_slam")
@@ -125,7 +144,21 @@ def main() -> None:
     result = {
         "traj_ws": str(traj_ws_path),
         "num_poses": len(poses_ws),
+        "loaded_frames": len(cam_data.frames),
+        "loaded_imu_samples": len(cam_data.imu_samples),
     }
+
+    if args.run_slam:
+        if actual_sensor is not None:
+            result["actual_sensor"] = actual_sensor
+        if processed_frames is not None:
+            result["processed_frames"] = processed_frames
+
+        if args.sensor_mode == "rgbd" and actual_sensor is not None and "RGB-D-Inertial" in actual_sensor:
+            print("Warning: Requested --sensor_mode rgbd but runtime reports RGB-D-Inertial.")
+
+        if len(poses_ws) < max(10, int(0.1 * max(1, len(cam_data.frames)))):
+            print("Warning: Trajectory is very short compared with loaded frames. Check orbslam_run.log for resets/lost tracking.")
 
     if args.plot:
         plot_paths = save_all_plots(poses_ws, out_dir, prefix="traj_ws")
