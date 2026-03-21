@@ -62,21 +62,39 @@ def run_offline_orbslam(
         cmd.append("--no-viewer")
 
     env = os.environ.copy()
-    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
+    # For Pangolin/GUI runs, piping stdout/stderr can be unstable on some systems.
+    # Stream directly to log file instead of capture_output.
     with log_path.open("w", encoding="utf-8") as f:
         f.write("# CMD\n")
         f.write(" ".join(cmd) + "\n\n")
-        f.write("# STDOUT\n")
-        f.write(proc.stdout)
-        f.write("\n# STDERR\n")
-        f.write(proc.stderr)
+        f.write("# STDOUT+STDERR\n")
+        f.flush()
 
-    if proc.returncode != 0:
-        raise RuntimeError(
-            "ORB-SLAM3 runner failed. "
-            f"returncode={proc.returncode}. See log: {log_path}"
+        proc = subprocess.Popen(
+            cmd,
+            stdout=f,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env,
         )
+        returncode = proc.wait()
+
+    if returncode != 0:
+        # Some ORB-SLAM3 + Viewer combinations may exit with a non-zero code
+        # after trajectory has been successfully saved. Keep the result usable.
+        if traj_path.exists() and traj_path.stat().st_size > 0:
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write("\n# WRAPPER_NOTE\n")
+                f.write(
+                    "Non-zero return code detected, but trajectory file exists and is non-empty. "
+                    f"Continuing. returncode={returncode}\n"
+                )
+        else:
+            raise RuntimeError(
+                "ORB-SLAM3 runner failed. "
+                f"returncode={returncode}. See log: {log_path}"
+            )
 
     if not traj_path.exists():
         raise RuntimeError(f"Trajectory file not found: {traj_path}")
