@@ -17,16 +17,17 @@ except ImportError:
 class CameraPoseVisualizer:
     """Visualize camera poses along trajectory with point cloud."""
     
-    def __init__(self, width: int = 1920, height: int = 1440):
+    def __init__(self, width: int = 1920, height: int = 1440, window_name: str = "ORB-SLAM3 Trajectory"):
         """
         Initialize visualizer.
         
         Args:
             width: Visualization window width
             height: Visualization window height
+            window_name: Window title
         """
         self.vis = o3d.visualization.Visualizer()
-        self.vis.create_window(width=width, height=height, left=0, top=0)
+        self.vis.create_window(window_name=window_name, width=width, height=height, left=0, top=0)
         
         # Visualization elements
         self.trajectory_line = None
@@ -233,10 +234,9 @@ class CameraPoseVisualizer:
         Run interactive visualization loop.
         
         Args:
-            title: Window title
+            title: Window title (note: cannot be changed after creation in Open3D)
         """
-        self.vis.get_window().set_title(title)
-        
+        # Note: Window title is set during initialization, cannot be changed dynamically
         # Interactive visualization loop
         while True:
             self.render()
@@ -263,6 +263,7 @@ def visualize_trajectory(
     depth_scale: float = 1000.0,
     keyframe_indices: Optional[List[int]] = None,
     interactive: bool = True,
+    window_name: str = "ORB-SLAM3 Trajectory",
 ):
     """
     Visualize trajectory with optional point cloud.
@@ -276,7 +277,7 @@ def visualize_trajectory(
         keyframe_indices: Indices of keyframes for highlighting
         interactive: If True, run interactive viewer; else just render
     """
-    visualizer = CameraPoseVisualizer()
+    visualizer = CameraPoseVisualizer(window_name=window_name)
     
     # Add trajectory
     visualizer.add_trajectory(poses)

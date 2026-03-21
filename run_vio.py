@@ -166,7 +166,7 @@ def main() -> None:
                 T = np.eye(4)
                 T[:3, 3] = pose.t  # Translation
                 # Quaternion to rotation matrix
-                q = pose.q  # [qx, qy, qz, qw]
+                q = pose.q_xyzw  # [qx, qy, qz, qw]
                 from scipy.spatial.transform import Rotation
                 T[:3, :3] = Rotation.from_quat(q).as_matrix()
                 pose_matrices.append(T)
@@ -210,6 +210,7 @@ def main() -> None:
                 depth_scale=args.depth_scale,
                 keyframe_indices=keyframe_indices,
                 interactive=True,
+                window_name="ORB-SLAM3 Trajectory Visualization",
             )
             
         except ImportError as e:
