@@ -16,6 +16,7 @@ from vio_tool.data_loader import load_camera_dataset
 from vio_tool.orbslam_interface import run_offline_orbslam
 from vio_tool.pose_math import load_traj_tum, save_traj_tum
 from vio_tool.visualization import detect_jumps, save_all_plots, save_overlay_video, save_trajectory_video
+from vio_tool.realtime_visualizer import visualize_trajectory
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,6 +44,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--video_tail", type=int, default=120, help="Visible trajectory tail length in frames")
     p.add_argument("--jump_trans_thresh", type=float, default=0.2, help="Jump detection threshold in meters")
     p.add_argument("--jump_rot_thresh_deg", type=float, default=10.0, help="Jump detection threshold in degrees")
+
+    p.add_argument("--visualize", action="store_true", help="Enable 3D visualization with Open3D (requires open3d)")
+    p.add_argument("--vis_with_pointcloud", action="store_true", help="Build and visualize point cloud (slower)")
+    p.add_argument("--vis_keyframes_only", action="store_true", help="Show camera models only for keyframes")
 
     p.add_argument("--do_align", action="store_true", help="Estimate T_WmWs and convert trajectory to Wm")
     p.add_argument("--t_wmb_file", default="", help="4x4 transform file for T_WmB (json/txt)")
@@ -148,6 +153,72 @@ def main() -> None:
                 fps=args.video_fps,
             )
             result["video_ws_overlay"] = str(overlay_ws)
+
+    if args.visualize:
+        """Visualize trajectory with 3D camera poses and optional point cloud."""
+        try:
+            import numpy as np
+            
+            # Convert trajectory to pose matrices
+            pose_matrices = []
+            for pose in poses_ws:
+                # pose is (timestamp, tx, ty, tz, qx, qy, qz, qw)
+                T = np.eye(4)
+                T[:3, 3] = pose.t  # Translation
+                # Quaternion to rotation matrix
+                q = pose.q  # [qx, qy, qz, qw]
+                from scipy.spatial.transform import Rotation
+                T[:3, :3] = Rotation.from_quat(q).as_matrix()
+                pose_matrices.append(T)
+            
+            # Prepare optional inputs
+            rgb_images = None
+            depth_images = None
+            intrinsics = None
+            keyframe_indices = None
+            
+            if args.vis_with_pointcloud:
+                # Load images from dataset
+                print("Loading RGB-D images for point cloud visualization...")
+                rgb_images = []
+                depth_images = []
+                for frame in cam_data.frames[:len(poses_ws)]:  # Match frame count to trajectory
+                    try:
+                        import cv2
+                        rgb = cv2.imread(str(frame.rgb_path))
+                        if rgb is not None:
+                            rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
+                            rgb_images.append(rgb)
+                        
+                        depth = cv2.imread(str(frame.depth_path), cv2.IMREAD_UNCHANGED)
+                        if depth is not None:
+                            depth_images.append(depth)
+                    except Exception as e:
+                        print(f"Warning: Could not load frame {frame.frame_index}: {e}")
+                
+                # Load camera intrinsics from settings
+                if args.settings and len(rgb_images) > 0:
+                    intrinsics = load_intrinsics_from_orb_yaml(args.settings)
+            
+            # Run visualization
+            print("Starting 3D visualization...")
+            visualize_trajectory(
+                poses=pose_matrices,
+                rgb_images=rgb_images if args.vis_with_pointcloud else None,
+                depth_images=depth_images if args.vis_with_pointcloud else None,
+                intrinsics=intrinsics,
+                depth_scale=args.depth_scale,
+                keyframe_indices=keyframe_indices,
+                interactive=True,
+            )
+            
+        except ImportError as e:
+            print(f"Visualization requires: pip install open3d scipy")
+            print(f"Import error: {e}")
+        except Exception as e:
+            print(f"Visualization error: {e}")
+            import traceback
+            traceback.print_exc()
 
     if args.do_align:
         if not args.settings:
