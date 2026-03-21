@@ -38,7 +38,8 @@ class CameraPoseVisualizer:
         # Settings
         self.render_options = self.vis.get_render_option()
         self.render_options.background_color = np.array([0.8, 0.8, 0.8])
-        self.render_options.point_size = 2.0
+        self.render_options.point_size = 5.0  # Larger points for better visibility
+        self.render_options.line_width = 2.0
         
         # Camera control
         self.view_control = self.vis.get_view_control()
@@ -156,47 +157,82 @@ class CameraPoseVisualizer:
             depth_scale: Depth image scale (mm to meters)
             sample_rate: Sample every nth pixel to reduce computation
         """
+        print(f"Creating point cloud from {len(rgb_images)} images...")
         points = []
         colors = []
         
         # Process every nth image
-        for idx in range(0, len(rgb_images), sample_rate):
-            rgb = rgb_images[idx]
-            depth = depth_images[idx] / depth_scale  # Convert to meters
-            pose = poses[idx]
+        for frame_idx in range(0, len(rgb_images), sample_rate):
+            if frame_idx >= len(depth_images) or frame_idx >= len(poses):
+                continue
+                
+            rgb = rgb_images[frame_idx]
+            depth = depth_images[frame_idx]
+            pose = poses[frame_idx]
             
-            # Get valid depth pixels
-            valid = depth > 0.1  # Skip close artifacts and invalid pixels
+            # Skip if invalid
+            if rgb is None or depth is None:
+                continue
+            
+            # Convert depth from mm to meters
+            depth_m = depth.astype(np.float32) / float(depth_scale)
+            
+            # Get valid depth pixels (depth > 0.05m and < 5m)
+            valid = (depth_m > 0.05) & (depth_m < 5.0)
             
             if not valid.any():
                 continue
             
             # Back-project using intrinsics
-            h, w = depth.shape
+            h, w = depth_m.shape
             v, u = np.where(valid)
             
-            # Normalize image coordinates
-            x = (u - intrinsics[0, 2]) / intrinsics[0, 0]
-            y = (v - intrinsics[1, 2]) / intrinsics[1, 1]
-            z = depth[valid]
+            # Normalize image coordinates using camera intrinsics
+            # K = [[fx,  0, cx],
+            #      [ 0, fy, cy],
+            #      [ 0,  0,  1]]
+            fx = intrinsics[0, 0]
+            fy = intrinsics[1, 1]
+            cx = intrinsics[0, 2]
+            cy = intrinsics[1, 2]
+            
+            x = (u - cx) / fx
+            y = (v - cy) / fy
+            z = depth_m[valid]
             
             # 3D points in camera frame
             pts_cam = np.stack([x * z, y * z, z], axis=-1)  # (N, 3)
             
-            # Transform to world frame
-            pts_world = (pose[:3, :3] @ pts_cam.T + pose[:3, 3:]).T
+            # Transform to world frame: P_world = R @ P_cam + t
+            R = pose[:3, :3]
+            t = pose[:3, 3]
+            pts_world = (R @ pts_cam.T).T + t
             points.append(pts_world)
             
-            # Get corresponding RGB values
-            colors.append(rgb[valid] / 255.0)  # Normalize to [0, 1]
-        
-        if points:
-            points = np.vstack(points)
-            colors = np.vstack(colors)
+            # Get corresponding RGB values and normalize
+            rgb_vals = rgb[valid].astype(np.float32) / 255.0
+            colors.append(rgb_vals)
             
-            self.point_cloud.points = o3d.utility.Vector3dVector(points)
-            self.point_cloud.colors = o3d.utility.Vector3dVector(colors)
-            self.vis.add_geometry(self.point_cloud, reset_bounding_box=False)
+            print(f"  Frame {frame_idx}: {len(pts_world)} points")
+        
+        if not points:
+            print("Warning: No valid points in point cloud")
+            return
+            
+        # Combine all points and colors
+        all_points = np.vstack(points)
+        all_colors = np.vstack(colors)
+        
+        print(f"Total points: {len(all_points)}, colors shape: {all_colors.shape}")
+        
+        # Create point cloud
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(all_points)
+        pcd.colors = o3d.utility.Vector3dVector(all_colors)
+        
+        # Add to visualizer
+        self.vis.add_geometry(pcd, reset_bounding_box=False)
+        print("Point cloud added to visualizer")
     
     def add_coordinate_frame(self, pose: np.ndarray, size: float = 0.1):
         """
@@ -294,9 +330,19 @@ def visualize_trajectory(
     # Add point cloud if images provided
     if rgb_images is not None and depth_images is not None and intrinsics is not None:
         print("Building point cloud... this may take a moment")
+        # Adaptive sampling rate based on number of frames
+        num_frames = len(rgb_images)
+        if num_frames <= 10:
+            sample_rate = 1  # Use all pixels for few frames
+        elif num_frames <= 30:
+            sample_rate = 2  # Use half the pixels
+        else:
+            sample_rate = 5  # Use 1/5 of pixels for many frames
+        
+        print(f"Using sample_rate={sample_rate} for {num_frames} frames")
         visualizer.add_point_cloud(
             rgb_images, depth_images, poses,
-            intrinsics, depth_scale, sample_rate=5
+            intrinsics, depth_scale, sample_rate=sample_rate
         )
     
     # Run or render
