@@ -28,6 +28,8 @@ _REQUIRED_COLUMNS = {
     "gyro_z",
 }
 
+_RAW_COLUMNS = {"ts_us", "sensor", "x", "y", "z"}
+
 
 def _row_to_timestamp_sec(row: dict[str, str]) -> float:
     ref = row.get("ref_ts_us", "")
@@ -47,23 +49,79 @@ def load_imu_csv(csv_path: str) -> list[ImuSample]:
     with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         cols = set(reader.fieldnames or [])
-        missing = _REQUIRED_COLUMNS.difference(cols)
-        if missing:
-            raise ValueError(f"imu.csv missing required columns: {sorted(missing)}")
-
         out: list[ImuSample] = []
-        for row in reader:
-            ts = _row_to_timestamp_sec(row)
-            out.append(
-                ImuSample(
-                    timestamp=ts,
-                    ax=float(row["accel_x"]),
-                    ay=float(row["accel_y"]),
-                    az=float(row["accel_z"]),
-                    gx=float(row["gyro_x"]),
-                    gy=float(row["gyro_y"]),
-                    gz=float(row["gyro_z"]),
+
+        # Format A (legacy): one row already contains accel+gyro fields.
+        if _REQUIRED_COLUMNS.issubset(cols):
+            for row in reader:
+                ts = _row_to_timestamp_sec(row)
+                out.append(
+                    ImuSample(
+                        timestamp=ts,
+                        ax=float(row["accel_x"]),
+                        ay=float(row["accel_y"]),
+                        az=float(row["accel_z"]),
+                        gx=float(row["gyro_x"]),
+                        gy=float(row["gyro_y"]),
+                        gz=float(row["gyro_z"]),
+                    )
                 )
+
+        # Format B (raw): ts_us,sensor,x,y,z with separate accel/gyro rows.
+        elif _RAW_COLUMNS.issubset(cols):
+            accel_rows: list[tuple[float, float, float, float]] = []
+            gyro_rows: list[tuple[float, float, float, float]] = []
+
+            for row in reader:
+                sensor = (row.get("sensor") or "").strip().lower()
+                ts = float(row["ts_us"]) * 1e-6
+                x = float(row["x"])
+                y = float(row["y"])
+                z = float(row["z"])
+
+                if sensor in {"accel", "accelerometer", "acc"}:
+                    accel_rows.append((ts, x, y, z))
+                elif sensor in {"gyro", "gyroscope", "gyr"}:
+                    gyro_rows.append((ts, x, y, z))
+
+            accel_rows.sort(key=lambda r: r[0])
+            gyro_rows.sort(key=lambda r: r[0])
+
+            # Pair accel and gyro streams by nearest timestamp.
+            i = 0
+            j = 0
+            max_pair_dt_sec = 0.005  # 5 ms tolerance for sensor timestamp skew
+            while i < len(accel_rows) and j < len(gyro_rows):
+                ta, ax, ay, az = accel_rows[i]
+                tg, gx, gy, gz = gyro_rows[j]
+                dt = ta - tg
+
+                if abs(dt) <= max_pair_dt_sec:
+                    out.append(
+                        ImuSample(
+                            timestamp=0.5 * (ta + tg),
+                            ax=ax,
+                            ay=ay,
+                            az=az,
+                            gx=gx,
+                            gy=gy,
+                            gz=gz,
+                        )
+                    )
+                    i += 1
+                    j += 1
+                elif dt < 0:
+                    i += 1
+                else:
+                    j += 1
+
+        else:
+            missing_legacy = sorted(_REQUIRED_COLUMNS.difference(cols))
+            missing_raw = sorted(_RAW_COLUMNS.difference(cols))
+            raise ValueError(
+                "Unsupported IMU csv schema. "
+                f"Legacy missing columns: {missing_legacy}; "
+                f"Raw missing columns: {missing_raw}."
             )
 
     out.sort(key=lambda x: x.timestamp)
